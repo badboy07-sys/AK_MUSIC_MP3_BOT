@@ -4,6 +4,7 @@ from replit import db
 from datetime import datetime
 from telebot import TeleBot, types
 from youtube_search import YoutubeSearch
+import requests
 
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 6670168751
@@ -24,6 +25,10 @@ def get_queue(uid): return db.get(f"queue_{uid}", [])
 def set_queue(uid, q): db[f"queue_{uid}"] = q
 def get_current(uid): return db.get(f"current_{uid}", 0)
 def set_current(uid, i): db[f"current_{uid}"] = i
+def get_playlist(uid): return db.get(f"playlist_{uid}", [])
+def add_playlist(uid, item):
+    arr = get_playlist(uid)
+    if item not in arr: arr.append(item); db[f"playlist_{uid}"] = arr
 
 def track_user(uid):
     today = datetime.now().strftime("%Y-%m-%d")
@@ -55,7 +60,7 @@ searching = set()
 @bot.message_handler(commands=['start'])
 def start(m):
     track_user(m.from_user.id)
-    msg = """🎵 **AK_X_MUSIC_BOT** 🎵
+    msg = """🎵 **AK_X_MUSIC_BOT PRO** 🎵
 
 Swagat hai {name}!
 
@@ -64,10 +69,11 @@ Swagat hai {name}!
 `YT Link` - Direct MP3
 `/mood` - 20+ Mood + Language
 `/queue` - Queue dekho
+`/playlist` - Save playlist
 `/next` `/back` `/stop` - Control
 `/fav` - Favourite list
 
-Sirf MP3 | Fast Download"""
+Sirf MP3 | Thumbnail + Fast Download"""
     bot.reply_to(m, msg.format(name=m.from_user.first_name), parse_mode="Markdown")
     if m.from_user.id!= ADMIN_ID:
         bot.send_message(ADMIN_ID, f"🔔 New User\nName: {m.from_user.first_name}\nID: `{m.from_user.id}`", parse_mode="Markdown")
@@ -83,6 +89,14 @@ def show_queue(m):
     if not q: return bot.reply_to(m, "Queue khali hai")
     text = "📜 **Queue:**\n" + "\n".join([f"{i+1}. {s['title'][:35]}" for i,s in enumerate(q)])
     bot.reply_to(m, text, parse_mode="Markdown")
+
+@bot.message_handler(commands=['playlist'])
+def show_playlist(m):
+    arr = get_playlist(m.chat.id)
+    if not arr: return bot.reply_to(m, "Playlist khali hai")
+    kb = types.InlineKeyboardMarkup()
+    for i,url in enumerate(arr): kb.add(types.InlineKeyboardButton(f"▶️ Play {i+1}", callback_data=f"playlist|{url}"))
+    bot.reply_to(m, "🎶 Your Playlist", reply_markup=kb)
 
 @bot.message_handler(commands=['stop'])
 def stop_song(m): set_current(m.chat.id, -1); bot.reply_to(m, "⏹️ Ruk gaya")
@@ -143,10 +157,11 @@ def search_and_queue(chat_id, query):
     searching.add(chat_id)
     try:
         results = YoutubeSearch(query, max_results=10).to_dict()
-        q = [{'title': r['title'], 'url': 'https://youtube.com' + r['url_suffix']} for r in results]
+        q = [{'title': r['title'], 'url': 'https://youtube.com' + r['url_suffix'], 'thumb': r['thumbnails'][0]} for r in results]
         set_queue(chat_id, q); set_current(chat_id, 0)
         kb = types.InlineKeyboardMarkup()
         kb.row(types.InlineKeyboardButton("▶️ Play", callback_data="playqueue"))
+        kb.row(types.InlineKeyboardButton("💾 Save Playlist", callback_data="saveplaylist"))
         kb.row(types.InlineKeyboardButton("⏮️ Back", callback_data="back"), types.InlineKeyboardButton("⏹️ Stop", callback_data="stop"), types.InlineKeyboardButton("⏭️ Next", callback_data="next"))
         bot.send_message(chat_id, f"✅ 10 gaane\nPehla: {q[0]['title']}", reply_markup=kb)
     except: bot.send_message(chat_id, "Error")
@@ -158,15 +173,24 @@ def play_from_queue(chat_id, direction):
     i = get_current(chat_id) + direction
     if i < 0 or i >= len(q): return bot.send_message(chat_id, "Queue khatam")
     set_current(chat_id, i)
-    download_and_send(chat_id, q[i]['url'])
+    download_and_send(chat_id, q[i]['url'], q[i]['title'], q[i]['thumb'])
 
-def download_and_send(chat_id, url):
+def download_and_send(chat_id, url, title="Song", thumb=None):
     try:
         opts = {'format': 'bestaudio', 'outtmpl': f'{chat_id}.%(ext)s', 'quiet': True,
                 'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '128'}]}
         with yt_dlp.YoutubeDL(opts) as ydl: info = ydl.extract_info(url, download=True)
-        bot.send_audio(chat_id, open(f'{chat_id}.mp3','rb'), title=info['title'][:50])
+        audio = open(f'{chat_id}.mp3','rb')
+        thumb_file = None
+        if thumb:
+            r = requests.get(thumb)
+            open(f'{chat_id}.jpg','wb').write(r.content)
+            thumb_file = open(f'{chat_id}.jpg','rb')
+        bot.send_audio(chat_id, audio, title=title[:50], thumb=thumb_file)
+        audio.close()
+        if thumb_file: thumb_file.close()
         os.remove(f'{chat_id}.mp3')
+        if thumb: os.remove(f'{chat_id}.jpg')
     except: bot.send_message(chat_id, "Download error")
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -175,7 +199,16 @@ def cb(call):
     if call.data == "next": next_song(call.message)
     if call.data == "back": back_song(call.message)
     if call.data == "stop": stop_song(call.message)
-    if call.data.startswith("playfav|"): download_and_send(call.message.chat.id, call.data.split("|")[1])
+    if call.data == "saveplaylist":
+        q = get_queue(call.message.chat.id)
+        for item in q: add_playlist(call.message.chat.id, item['url'])
+        bot.answer_callback_query(call.id, "Playlist me save ho gaya")
+    if call.data.startswith("playfav|"):
+        url = call.data.split("|")[1]
+        download_and_send(call.message.chat.id, url)
+    if call.data.startswith("playlist|"):
+        url = call.data.split("|")[1]
+        download_and_send(call.message.chat.id, url)
 
-print("AK_X_MUSIC_BOT Chal Gaya")
+print("AK_X_MUSIC_BOT PRO Chal Gaya")
 bot.infinity_polling(none_stop=True)
