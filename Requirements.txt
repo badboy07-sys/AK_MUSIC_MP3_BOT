@@ -1,5 +1,5 @@
 pyTelegramBotAPI
-yt-dlp
 youtube-search-python
-requests
-replit
+yt-dlp
+python-dotenv
+flask
