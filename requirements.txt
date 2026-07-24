@@ -1,5 +1,5 @@
-pyrogram
-tgcrypto
-yt-dlp
-flask
-gunicorn
+Collecting pyrogram
+Collecting tgcrypto  
+Collecting yt-dlp
+Collecting flask
+Collecting gunicorn
