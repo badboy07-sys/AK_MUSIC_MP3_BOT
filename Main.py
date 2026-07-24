@@ -5,6 +5,18 @@ from datetime import datetime
 from telebot import TeleBot, types
 from youtube_search import YoutubeSearch
 import requests
+from flask import Flask
+from threading import Thread
+
+app = Flask('')
+@app.route('/')
+def home():
+    return "AK_X_MUSIC_BOT is Alive!"
+def run():
+    app.run(host='0.0.0.0', port=8080)
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
 
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 6670168751
@@ -60,35 +72,36 @@ searching = set()
 @bot.message_handler(commands=['start'])
 def start(m):
     track_user(m.from_user.id)
-    msg = """🎵 **AK_X_MUSIC_BOT PRO** 🎵
+    name = m.from_user.first_name
+    msg = f"""🎵 AK_X_MUSIC_BOT PRO 🎵
 
 Swagat hai {name}!
 
-**Commands:**
-`Gaane ka naam` - Search
-`YT Link` - Direct MP3
-`/mood` - 20+ Mood + Language
-`/queue` - Queue dekho
-`/playlist` - Save playlist
-`/next` `/back` `/stop` - Control
-`/fav` - Favourite list
+Commands:
+Gaane ka naam - Search
+YT Link - Direct MP3
+/mood - 20+ Mood + Language
+/queue - Queue dekho
+/playlist - Save playlist
+/next /back /stop - Control
+/fav - Favourite list
 
 Sirf MP3 | Thumbnail + Fast Download"""
-    bot.reply_to(m, msg.format(name=m.from_user.first_name), parse_mode="Markdown")
+    bot.reply_to(m, msg)
     if m.from_user.id!= ADMIN_ID:
-        bot.send_message(ADMIN_ID, f"🔔 New User\nName: {m.from_user.first_name}\nID: `{m.from_user.id}`", parse_mode="Markdown")
+        bot.send_message(ADMIN_ID, f"🔔 New User\nName: {name}\nID: {m.from_user.id}")
 
 @bot.message_handler(commands=['mood'])
 def mood_list(m):
-    text = "🎭 **AK_X_MUSIC_BOT - Types:**\n" + "\n".join([f"`/mood {k}`" for k in MOODS.keys()])
-    bot.reply_to(m, text, parse_mode="Markdown")
+    text = "🎭 AK_X_MUSIC_BOT - Types:\n" + "\n".join([f"/mood {k}" for k in MOODS.keys()])
+    bot.reply_to(m, text)
 
 @bot.message_handler(commands=['queue'])
 def show_queue(m):
     q = get_queue(m.chat.id)
     if not q: return bot.reply_to(m, "Queue khali hai")
-    text = "📜 **Queue:**\n" + "\n".join([f"{i+1}. {s['title'][:35]}" for i,s in enumerate(q)])
-    bot.reply_to(m, text, parse_mode="Markdown")
+    text = "📜 Queue:\n" + "\n".join([f"{i+1}. {s['title'][:35]}" for i,s in enumerate(q)])
+    bot.reply_to(m, text)
 
 @bot.message_handler(commands=['playlist'])
 def show_playlist(m):
@@ -124,18 +137,18 @@ def admin_cmds(m):
     if parts[0] == '/users':
         users = db.get("users", [])
         if not users: return bot.reply_to(m, "Abhi koi user nahi")
-        text = f"👥 **Total Users: {len(users)}**\n\n"
+        text = f"👥 Total Users: {len(users)}\n\n"
         for i,uid in enumerate(users):
-            text += f"{i+1}. `{uid}`\n"
+            text += f"{i+1}. {uid}\n"
         for i in range(0, len(text), 4000):
-            bot.send_message(m.chat.id, text[i:i+4000], parse_mode="Markdown")
+            bot.send_message(m.chat.id, text[i:i+4000])
     if parts[0] == '/stats':
         total = len(db.get("users", [])); month = datetime.now().strftime("%Y-%m"); today = datetime.now().strftime("%Y-%m-%d")
         monthly = len(db.get(f"monthly_{month}", [])); daily = len(db.get(f"daily_{today}", [])); banned = len(get_banned())
-        bot.reply_to(m, f"📊 **AK_X_MUSIC_BOT Stats**\nTotal: {total}\nIs Mahine: {monthly}\nAaj: {daily}\nBanned: {banned}", parse_mode="Markdown")
+        bot.reply_to(m, f"📊 AK_X_MUSIC_BOT Stats\nTotal: {total}\nIs Mahine: {monthly}\nAaj: {daily}\nBanned: {banned}")
     if parts[0] == '/monthly':
         month = datetime.now().strftime("%Y-%m"); monthly_users = len(db.get(f"monthly_{month}", []))
-        bot.reply_to(m, f"📅 **{month} Report**\nNaye Users: {monthly_users}", parse_mode="Markdown")
+        bot.reply_to(m, f"📅 {month} Report\nNaye Users: {monthly_users}")
 
 @bot.message_handler(func=lambda m: True)
 def handle_msg(m):
@@ -151,7 +164,7 @@ def handle_msg(m):
         download_and_send(m.chat.id, text)
     else:
         search_and_queue(m.chat.id, m.text)
-        bot.send_message(ADMIN_ID, f"🔔 Activity\nUser: {m.from_user.first_name}\nID: `{m.from_user.id}`\nSearch: {m.text}", parse_mode="Markdown")
+        bot.send_message(ADMIN_ID, f"🔔 Activity\nUser: {m.from_user.first_name}\nID: {m.from_user.id}\nSearch: {m.text}")
 
 def search_and_queue(chat_id, query):
     searching.add(chat_id)
@@ -163,8 +176,8 @@ def search_and_queue(chat_id, query):
         kb.row(types.InlineKeyboardButton("▶️ Play", callback_data="playqueue"))
         kb.row(types.InlineKeyboardButton("💾 Save Playlist", callback_data="saveplaylist"))
         kb.row(types.InlineKeyboardButton("⏮️ Back", callback_data="back"), types.InlineKeyboardButton("⏹️ Stop", callback_data="stop"), types.InlineKeyboardButton("⏭️ Next", callback_data="next"))
-        bot.send_message(chat_id, f"✅ 10 gaane\nPehla: {q[0]['title']}", reply_markup=kb)
-    except: bot.send_message(chat_id, "Error")
+        bot.send_message(chat_id, f"✅ 10 gaane mil gaye\nPehla: {q[0]['title']}", reply_markup=kb)
+    except: bot.send_message(chat_id, "Error aaya")
     searching.discard(chat_id)
 
 def play_from_queue(chat_id, direction):
@@ -211,4 +224,5 @@ def cb(call):
         download_and_send(call.message.chat.id, url)
 
 print("AK_X_MUSIC_BOT PRO Chal Gaya")
+keep_alive()
 bot.infinity_polling(none_stop=True)
