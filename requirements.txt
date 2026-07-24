@@ -1,8 +1,5 @@
 pyrogram
-pytgcalls
-py-tgcalls
-telebot
+tgcrypto
 yt-dlp
-python-dotenv
 flask
-ffmpeg-python
+gunicorn
