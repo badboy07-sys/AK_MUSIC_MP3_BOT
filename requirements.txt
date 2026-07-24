@@ -1,6 +1,8 @@
-pyrogram
-tgcrypto
+pyTelegramBotAPI
 yt-dlp
-flask
+pyrogram
+pytgcalls
+ffmpeg-python
 gunicorn
+flask
 python-dotenv
