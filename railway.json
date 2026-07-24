@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "python main.py",
+    "startCommand": "pip install -r requirements.txt && python main.py",
     "nixpacksConfig": {
       "phases": {
         "setup": {
