@@ -4,13 +4,13 @@ import sqlite3
 import asyncio
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from dotenv import load_dotenv
 from flask import Flask
 from yt_dlp import YoutubeDL
 
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ForceReply
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from pyrogram import Client
 from pytgcalls import PyTgCalls
@@ -49,7 +49,6 @@ conn.commit()
 
 search_results = {}
 user_queue = {}
-user_state = {}
 
 def load_queues():
     global user_queue
@@ -102,7 +101,7 @@ def get_youtube_info(query):
         return info['url'], info['title']
 
 def download_audio(url, chat_id):
-    ydl_opts = {'format': 'bastaudio/best', 'outtmpl': f'{chat_id}_%(id)s.%(ext)s', 'writethumbnail': True, 'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '128'}, {'key': 'EmbedThumbnail', 'already_have_thumbnail': False}], 'quiet': True, 'noplaylist': True}
+    ydl_opts = {'format': 'bestaudio/best', 'outtmpl': f'{chat_id}_%(id)s.%(ext)s', 'writethumbnail': True, 'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '128'}, {'key': 'EmbedThumbnail', 'already_have_thumbnail': False}], 'quiet': True, 'noplaylist': True}
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info).replace('.webm', '.mp3').replace('.m4a', '.mp3')
@@ -213,7 +212,6 @@ def start(m):
 @bot.callback_query_handler(func=lambda call: True)
 def menu_callback(call):
     cid = call.message.chat.id
-    uid = call.from_user.id
     if call.data == "loop_btn": loop(call.message)
     elif call.data == "bg_btn": bgmode(call.message)
     elif call.data == "queue_btn": show_queue(call.message)
