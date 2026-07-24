@@ -1,5 +1,8 @@
-pyTelegramBotAPI
+pyrogram
+pytgcalls
+py-tgcalls
+telebot
 yt-dlp
 python-dotenv
 flask
-youtubesearchpython
+ffmpeg-python
